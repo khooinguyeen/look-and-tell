@@ -106,5 +106,20 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    @Override
+    protected void onPause() {
+        super.onPause();
+        converter.close();
+    }
+
+    @Override
+    public void onRequestPermissionResult(
+            int requestCode, String[] permissions,int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        PermissionHelper.onRequestPermissionsResult(requestCode, permissions, grantResults);
+    }
+
+
+
 
 }
