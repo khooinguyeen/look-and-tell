@@ -1,5 +1,6 @@
 package com.khooinguyeen.lookandtell;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.content.pm.ApplicationInfo;
@@ -11,6 +12,7 @@ import android.util.Size;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
+import android.view.ViewGroup;
 
 import com.google.mediapipe.components.CameraHelper;
 import com.google.mediapipe.components.CameraXPreviewHelper;
@@ -116,7 +118,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
-    public void onRequestPermissionResult(
+    public void onRequestPermissionsResult(
             int requestCode, String[] permissions,int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         PermissionHelper.onRequestPermissionsResult(requestCode, permissions, grantResults);
@@ -174,6 +176,29 @@ public class MainActivity extends AppCompatActivity {
         );
     }
 
+    private void setupPreviewDisplayView() {
+        previewDisplayView.setVisibility(View.GONE);
+        ViewGroup viewGroup = findViewById(R.id.preview_display_layout);
+        viewGroup.addView(previewDisplayView);
 
+        previewDisplayView
+                .getHolder()
+                .addCallback(
+                        new SurfaceHolder.Callback() {
+                            @Override
+                            public void surfaceCreated(@NonNull SurfaceHolder holder) {
+                                processor.getVideoSurfaceOutput().setSurface(holder.getSurface());
+                            }
 
+                            @Override
+                            public void surfaceChanged(@NonNull SurfaceHolder holder, int format, int width, int height) {
+                                onPreviewDisplaySurfaceChanged(holder, format, width, height);
+                            }
+
+                            @Override
+                            public void surfaceDestroyed(@NonNull SurfaceHolder holder) {
+                                processor.getVideoSurfaceOutput().setSurface(null);
+                            }
+                        });
+    }
 }
