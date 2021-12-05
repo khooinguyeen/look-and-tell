@@ -7,7 +7,10 @@ import android.content.pm.PackageManager;
 import android.graphics.SurfaceTexture;
 import android.os.Bundle;
 import android.util.Log;
+import android.util.Size;
+import android.view.SurfaceHolder;
 import android.view.SurfaceView;
+import android.view.View;
 
 import com.google.mediapipe.components.CameraHelper;
 import com.google.mediapipe.components.CameraXPreviewHelper;
@@ -119,6 +122,57 @@ public class MainActivity extends AppCompatActivity {
         PermissionHelper.onRequestPermissionsResult(requestCode, permissions, grantResults);
     }
 
+    protected void onCameraStarted(SurfaceTexture surfaceTexture){
+        previewFrameTexture = surfaceTexture;
+        // Hiển thị chế độ xem hiển thị để bắt đầu hiển thị bản xem trước. Điều này kích hoạt
+        // SurfaceHolder.Callback được thêm vào (chủ sở hữu của) previewDisplayView.
+        previewDisplayView.setVisibility(View.VISIBLE);
+    }
+
+    protected Size cameraTargetResolution() {
+        return null;
+        // Không tùy chọn và để máy ảnh (người trợ giúp) quyết định.
+    }
+
+    public void startCamera() {
+        cameraHelper = new CameraXPreviewHelper();
+        cameraHelper.setOnCameraStartedListener(
+            surfaceTexture -> {
+                onCameraStarted(surfaceTexture);
+            }
+        );
+        CameraHelper.CameraFacing cameraFacing =
+                applicationInfo.metaData.getBoolean("cameraFacingFront",  false)
+                        ? CameraHelper.CameraFacing.FRONT
+                        : CameraHelper.CameraFacing.BACK;
+        cameraHelper.startCamera(
+                this,cameraFacing, /*surfaceTexture=*/ null, cameraTargetResolution()
+        );
+    }
+
+    protected Size computeViewSize(int width, int height) {
+        return new Size(width, height);
+    }
+
+    protected void onPreviewDisplaySurfaceChanged(
+            SurfaceHolder holder, int format, int width, int height) {
+        // Tính kích thước lý tưởng của màn hình xem trước máy ảnh (khu vực mà
+        // khung xem trước máy ảnh được hiển thị trên đó, có khả năng chia tỷ lệ và xoay)
+        // dựa trên kích thước của SurfaceView chứa màn hình.
+        Size viewSize = computeViewSize(width, height);
+        Size displaySize = cameraHelper.computeDisplaySizeFromViewSize(viewSize);
+        boolean isCameraRotated = cameraHelper.isCameraRotated();
+
+        // Kết nối bộ chuyển đổi với khung xem trước máy ảnh làm đầu vào của nó (thông qua
+        // previewFrameTexture), và định cấu hình chiều rộng và chiều cao đầu ra như được tính
+        // kích thước hiển thị.
+
+        converter.setSurfaceTextureAndAttachToGLContext(
+                previewFrameTexture,
+                isCameraRotated ? displaySize.getHeight() : displaySize.getWidth(),
+                isCameraRotated ? displaySize.getWidth() : displaySize.getHeight()
+        );
+    }
 
 
 
