@@ -1,6 +1,5 @@
 package com.khooinguyeen.lookandtell;
 
-import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.content.pm.ApplicationInfo;
@@ -22,64 +21,66 @@ import com.google.mediapipe.components.PermissionHelper;
 import com.google.mediapipe.framework.AndroidAssetUtil;
 import com.google.mediapipe.glutil.EglManager;
 
-
 public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "MainActivity";
 
-    // Lật các frame camera-preview
+    // Flips the camera-preview frames vertically by default, before sending them into FrameProcessor
+    // to be processed in a MediaPipe graph, and flips the processed frames back when they are
+    // displayed. This maybe needed because OpenGL represents images assuming the image origin is at
+    // the bottom-left corner, whereas MediaPipe in general assumes the image origin is at the
+    // top-left corner.
+    // NOTE: use "flipFramesVertically" in manifest metadata to override this behavior.
     private static final boolean FLIP_FRAMES_VERTICALLY = true;
 
     static {
-        // Load các thư viện native cần thiết
+        // Load all native libraries needed by the app.
         System.loadLibrary("mediapipe_jni");
         try {
             System.loadLibrary("opencv_java3");
-        } catch(UnsatisfiedLinkError e) {
-            // Ngoài opencv_java3 thì phải load thêm ver 4 vì một số chức năng yêu cầu openCV 4
+        } catch (UnsatisfiedLinkError e) {
+            // Some example apps (e.g. template matching) require OpenCV 4.
             System.loadLibrary("opencv_java4");
         }
     }
 
-    // Gửi các frame camera-preview sang Mediapipe graph để xử lý, sau đó display những
-    // frame được xử lý lên 1 cái {@link Surface}.
+    // Sends camera-preview frames into a MediaPipe graph for processing, and displays the processed
+    // frames onto a {@link Surface}.
     protected FrameProcessor processor;
-    // xử lý quyền truy cập máy ảnh thông qua thư viện hỗ trợ Jetpack {@link CameraX}.
+    // Handles camera access via the {@link CameraX} Jetpack support library.
     protected CameraXPreviewHelper cameraHelper;
 
-    // {@link SurfaceTexture} nơi có thể truy cập các khung xem trước máy ảnh.
+    // {@link SurfaceTexture} where the camera-preview frames can be accessed.
     private SurfaceTexture previewFrameTexture;
-
-    // {@link SurfaceView} hiển thị khung xem trước máy ảnh được xử lý bởi biểu đồ MediaPipe.
+    // {@link SurfaceView} that displays the camera-preview frames processed by a MediaPipe graph.
     private SurfaceView previewDisplayView;
 
-    // Tạo và quản lý {@link EGLContext}.
+    // Creates and manages an {@link EGLContext}.
     private EglManager eglManager;
-
-    // Chuyển đổi họa tiết GL_TEXTURE_EXTERNAL_OES từ máy ảnh Android thành họa tiết thông thường.
-    // được sử dụng bởi {@link FrameProcessor} và biểu đồ MediaPipe bên dưới.
+    // Converts the GL_TEXTURE_EXTERNAL_OES texture from Android camera into a regular texture to be
+    // consumed by {@link FrameProcessor} and the underlying MediaPipe graph.
     private ExternalTextureConverter converter;
 
-    // ApplicationInfo để truy xuất siêu dữ liệu được xác định trong tệp kê khai.
+    // ApplicationInfo for retrieving metadata defined in the manifest.
     private ApplicationInfo applicationInfo;
 
     @Override
-    protected void onCreate(Bundle savedIntanceState) {
-        super.onCreate(savedIntanceState);
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
         try {
             applicationInfo =
                     getPackageManager().getApplicationInfo(getPackageName(), PackageManager.GET_META_DATA);
-        } catch(PackageManager.NameNotFoundException e) {
+        } catch (PackageManager.NameNotFoundException e) {
             Log.e(TAG, "Cannot find application info: " + e);
         }
 
         previewDisplayView = new SurfaceView(this);
         setupPreviewDisplayView();
 
-        // Khởi tạo trình quản lý nội dung để các thư viện gốc MediaPipe có thể truy cập vào nội dung ứng dụng, ví dụ:
-        // đồ thị nhị phân.
+        // Initialize asset manager so that MediaPipe native libraries can access the app assets, e.g.,
+        // binary graphs.
         AndroidAssetUtil.initializeNativeAssetManager(this);
         eglManager = new EglManager(null);
         processor =
@@ -104,8 +105,8 @@ public class MainActivity extends AppCompatActivity {
         super.onResume();
         converter = new ExternalTextureConverter(eglManager.getContext());
         converter.setFlipY(
-                applicationInfo.metaData.getBoolean("flipFrameVertically", FLIP_FRAMES_VERTICALLY)
-        );
+                applicationInfo.metaData.getBoolean("flipFramesVertically", FLIP_FRAMES_VERTICALLY));
+        converter.setConsumer(processor);
         if (PermissionHelper.cameraPermissionsGranted(this)) {
             startCamera();
         }
@@ -119,37 +120,34 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     public void onRequestPermissionsResult(
-            int requestCode, String[] permissions,int[] grantResults) {
+            int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         PermissionHelper.onRequestPermissionsResult(requestCode, permissions, grantResults);
     }
 
-    protected void onCameraStarted(SurfaceTexture surfaceTexture){
+    protected void onCameraStarted(SurfaceTexture surfaceTexture) {
         previewFrameTexture = surfaceTexture;
-        // Hiển thị chế độ xem hiển thị để bắt đầu hiển thị bản xem trước. Điều này kích hoạt
-        // SurfaceHolder.Callback được thêm vào (chủ sở hữu của) previewDisplayView.
+        // Make the display view visible to start showing the preview. This triggers the
+        // SurfaceHolder.Callback added to (the holder of) previewDisplayView.
         previewDisplayView.setVisibility(View.VISIBLE);
     }
 
     protected Size cameraTargetResolution() {
-        return null;
-        // Không tùy chọn và để máy ảnh (người trợ giúp) quyết định.
+        return null; // No preference and let the camera (helper) decide.
     }
 
     public void startCamera() {
         cameraHelper = new CameraXPreviewHelper();
         cameraHelper.setOnCameraStartedListener(
-            surfaceTexture -> {
-                onCameraStarted(surfaceTexture);
-            }
-        );
+                surfaceTexture -> {
+                    onCameraStarted(surfaceTexture);
+                });
         CameraHelper.CameraFacing cameraFacing =
-                applicationInfo.metaData.getBoolean("cameraFacingFront",  false)
+                applicationInfo.metaData.getBoolean("cameraFacingFront", false)
                         ? CameraHelper.CameraFacing.FRONT
                         : CameraHelper.CameraFacing.BACK;
         cameraHelper.startCamera(
-                this,cameraFacing, /*surfaceTexture=*/ null, cameraTargetResolution()
-        );
+                this, cameraFacing, /*surfaceTexture=*/ null, cameraTargetResolution());
     }
 
     protected Size computeViewSize(int width, int height) {
@@ -158,22 +156,20 @@ public class MainActivity extends AppCompatActivity {
 
     protected void onPreviewDisplaySurfaceChanged(
             SurfaceHolder holder, int format, int width, int height) {
-        // Tính kích thước lý tưởng của màn hình xem trước máy ảnh (khu vực mà
-        // khung xem trước máy ảnh được hiển thị trên đó, có khả năng chia tỷ lệ và xoay)
-        // dựa trên kích thước của SurfaceView chứa màn hình.
+        // (Re-)Compute the ideal size of the camera-preview display (the area that the
+        // camera-preview frames get rendered onto, potentially with scaling and rotation)
+        // based on the size of the SurfaceView that contains the display.
         Size viewSize = computeViewSize(width, height);
         Size displaySize = cameraHelper.computeDisplaySizeFromViewSize(viewSize);
         boolean isCameraRotated = cameraHelper.isCameraRotated();
 
-        // Kết nối bộ chuyển đổi với khung xem trước máy ảnh làm đầu vào của nó (thông qua
-        // previewFrameTexture), và định cấu hình chiều rộng và chiều cao đầu ra như được tính
-        // kích thước hiển thị.
-
+        // Connect the converter to the camera-preview frames as its input (via
+        // previewFrameTexture), and configure the output width and height as the computed
+        // display size.
         converter.setSurfaceTextureAndAttachToGLContext(
                 previewFrameTexture,
                 isCameraRotated ? displaySize.getHeight() : displaySize.getWidth(),
-                isCameraRotated ? displaySize.getWidth() : displaySize.getHeight()
-        );
+                isCameraRotated ? displaySize.getWidth() : displaySize.getHeight());
     }
 
     private void setupPreviewDisplayView() {
@@ -186,17 +182,17 @@ public class MainActivity extends AppCompatActivity {
                 .addCallback(
                         new SurfaceHolder.Callback() {
                             @Override
-                            public void surfaceCreated(@NonNull SurfaceHolder holder) {
+                            public void surfaceCreated(SurfaceHolder holder) {
                                 processor.getVideoSurfaceOutput().setSurface(holder.getSurface());
                             }
 
                             @Override
-                            public void surfaceChanged(@NonNull SurfaceHolder holder, int format, int width, int height) {
+                            public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
                                 onPreviewDisplaySurfaceChanged(holder, format, width, height);
                             }
 
                             @Override
-                            public void surfaceDestroyed(@NonNull SurfaceHolder holder) {
+                            public void surfaceDestroyed(SurfaceHolder holder) {
                                 processor.getVideoSurfaceOutput().setSurface(null);
                             }
                         });

@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.khooinguyeen.lookandtell">
+    <!-- For using the camera -->
+    <uses-permission android:name="android.permission.CAMERA" />
 
-    <uses-permission android:name="android.permission.CAMERA"/>
-
-    <uses-feature android:name="android.hardware.camera"/>
-    <uses-feature android:name="android.hardware.camera.autofocus"/>
+    <uses-feature android:name="android.hardware.camera" />
+    <uses-feature android:name="android.hardware.camera.autofocus" />
 
     <application
         android:allowBackup="true"
@@ -14,9 +14,7 @@
         android:roundIcon="@mipmap/lookandtell_ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.LookAndTell">
-        <activity
-            android:name=".MainActivity"
-            android:exported="true">
+        <activity android:name="com.khooinguyeen.lookandtell.MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
@@ -41,7 +39,7 @@
             android:name="flipFramesVertically"
             android:value="true" />
         <meta-data
-            android:name="converterNumbuffers"
+            android:name="converterNumBuffers"
             android:value="3" />
     </application>
 
