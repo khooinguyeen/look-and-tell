@@ -18,8 +18,13 @@ import com.google.mediapipe.components.CameraXPreviewHelper;
 import com.google.mediapipe.components.ExternalTextureConverter;
 import com.google.mediapipe.components.FrameProcessor;
 import com.google.mediapipe.components.PermissionHelper;
+import com.google.mediapipe.formats.proto.LandmarkProto.NormalizedLandmark;
+import com.google.mediapipe.formats.proto.LandmarkProto.NormalizedLandmarkList;
 import com.google.mediapipe.framework.AndroidAssetUtil;
+import com.google.mediapipe.framework.PacketGetter;
 import com.google.mediapipe.glutil.EglManager;
+
+import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -33,6 +38,7 @@ public class MainActivity extends AppCompatActivity {
      * LƯU Ý: sử dụng "flipFramesVerently" trong siêu dữ liệu tệp kê khai để ghi đè hành vi này.
      */
     private static final boolean FLIP_FRAMES_VERTICALLY = true;
+    private static final String OUTPUT_LANDMARKS_STREAM_NAME = "holistic_landmarks";
 
     static {
         // Tải các thư viện cần thiết cho app
@@ -104,6 +110,23 @@ public class MainActivity extends AppCompatActivity {
                         applicationInfo.metaData.getBoolean("flipFramesVertically", FLIP_FRAMES_VERTICALLY));
 
         PermissionHelper.checkAndRequestCameraPermissions(this);
+
+        if(Log.isLoggable(TAG, Log.VERBOSE)) {
+            processor.addPacketCallback(
+                    OUTPUT_LANDMARKS_STREAM_NAME,
+                    (packet) -> {
+                        Log.v(TAG, "received packet.");
+                        List<NormalizedLandmarkList> holisticLandmark =
+                                PacketGetter.getProtoVector(packet, NormalizedLandmarkList.parser());
+                        Log.v(
+                                TAG,
+                                "[TS:"
+                                        + packet.getTimestamp()
+                                        + "] "
+                                        + getHolisticLandmarksDebugString(holisticLandmark));
+                    }
+            );
+        }
     }
 
     @Override
@@ -210,5 +233,33 @@ public class MainActivity extends AppCompatActivity {
                                 processor.getVideoSurfaceOutput().setSurface(null);
                             }
                         });
+    }
+
+    private String getHolisticLandmarksDebugString(List<NormalizedLandmarkList> holisticLandmarks) {
+        if (holisticLandmarks.isEmpty()) {
+            return "No hand landmarks";
+        }
+        String holisticLandmarksStr = "Number of hands detected: " + holisticLandmarks.size() + "\n";
+        int holisticIndex = 0;
+        for (NormalizedLandmarkList landmarks : holisticLandmarks) {
+            holisticLandmarksStr +=
+                    "\t#Hand landmarks for hand[" + holisticIndex + "]: " + landmarks.getLandmarkCount() + "\n";
+            int landmarkIndex = 0;
+            for (NormalizedLandmark landmark : landmarks.getLandmarkList()) {
+                holisticLandmarksStr +=
+                        "\t\tLandmark ["
+                                + landmarkIndex
+                                + "]: ("
+                                + landmark.getX()
+                                + ", "
+                                + landmark.getY()
+                                + ", "
+                                + landmark.getZ()
+                                + ")\n";
+                ++landmarkIndex;
+            }
+            ++holisticIndex;
+        }
+        return holisticLandmarksStr;
     }
 }
