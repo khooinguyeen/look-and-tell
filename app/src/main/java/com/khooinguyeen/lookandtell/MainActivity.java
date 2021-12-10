@@ -25,43 +25,49 @@ public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "MainActivity";
 
-    // Flips the camera-preview frames vertically by default, before sending them into FrameProcessor
-    // to be processed in a MediaPipe graph, and flips the processed frames back when they are
-    // displayed. This maybe needed because OpenGL represents images assuming the image origin is at
-    // the bottom-left corner, whereas MediaPipe in general assumes the image origin is at the
-    // top-left corner.
-    // NOTE: use "flipFramesVertically" in manifest metadata to override this behavior.
+    /** Lật các khung xem trước máy ảnh theo chiều dọc theo mặc định, trước khi gửi chúng vào FrameProcessor
+     * được xử lý trong biểu đồ MediaPipe và lật ngược các khung đã xử lý khi chúng
+     * hiển thị. Điều này có thể cần thiết vì OpenGL đại diện cho hình ảnh giả sử nguồn gốc hình ảnh là
+     * góc dưới cùng bên trái, trong khi MediaPipe nói chung giả định nguồn gốc hình ảnh là ở
+     * góc trên bên trái.
+     * LƯU Ý: sử dụng "flipFramesVerently" trong siêu dữ liệu tệp kê khai để ghi đè hành vi này.
+     */
     private static final boolean FLIP_FRAMES_VERTICALLY = true;
 
     static {
-        // Load all native libraries needed by the app.
+        // Tải các thư viện cần thiết cho app
         System.loadLibrary("mediapipe_jni");
         try {
             System.loadLibrary("opencv_java3");
         } catch (UnsatisfiedLinkError e) {
-            // Some example apps (e.g. template matching) require OpenCV 4.
+            // Một số ứng dụng yêu cầu openCV 4
             System.loadLibrary("opencv_java4");
         }
     }
 
-    // Sends camera-preview frames into a MediaPipe graph for processing, and displays the processed
-    // frames onto a {@link Surface}.
+
+    /** Gửi các khung xem trước máy ảnh vào biểu đồ MediaPipe để xử lý và hiển thị các khung đã xử lý
+    * đóng khung vào Surface.*/
     protected FrameProcessor processor;
-    // Handles camera access via the {@link CameraX} Jetpack support library.
+
+    /** Xử lý quyền truy cập máy ảnh thông qua thư viện hỗ trợ Jetpack CameraX. */
     protected CameraXPreviewHelper cameraHelper;
 
-    // {@link SurfaceTexture} where the camera-preview frames can be accessed.
+    /** {@link SurfaceTexture} nơi có thể truy cập các khung xem trước máy ảnh. */
     private SurfaceTexture previewFrameTexture;
-    // {@link SurfaceView} that displays the camera-preview frames processed by a MediaPipe graph.
+
+    /** {@link SurfaceView} hiển thị các khung xem trước máy ảnh được xử lý bởi biểu đồ MediaPipe.*/
     private SurfaceView previewDisplayView;
 
-    // Creates and manages an {@link EGLContext}.
+    /** Tạo và quản lý EGLContext.*/
     private EglManager eglManager;
-    // Converts the GL_TEXTURE_EXTERNAL_OES texture from Android camera into a regular texture to be
-    // consumed by {@link FrameProcessor} and the underlying MediaPipe graph.
+
+    /** Chuyển đổi đồ họa GL_TEXTURE_EXTERNAL_OES từ máy ảnh Android thành đồ họa thông thường.
+     * được sử dụng bởi {@link FrameProcessor} và biểu đồ MediaPipe bên dưới.
+     */
     private ExternalTextureConverter converter;
 
-    // ApplicationInfo for retrieving metadata defined in the manifest.
+    // ApplicationInfo để truy xuất siêu dữ liệu được xác định trong manifest
     private ApplicationInfo applicationInfo;
 
     @Override
@@ -79,8 +85,8 @@ public class MainActivity extends AppCompatActivity {
         previewDisplayView = new SurfaceView(this);
         setupPreviewDisplayView();
 
-        // Initialize asset manager so that MediaPipe native libraries can access the app assets, e.g.,
-        // binary graphs.
+        // Khởi tạo trình quản lý nội dung để các thư viện gốc MediaPipe có thể truy cập vào nội dung ứng dụng, ví dụ:
+        // đồ thị nhị phân.
         AndroidAssetUtil.initializeNativeAssetManager(this);
         eglManager = new EglManager(null);
         processor =
@@ -159,6 +165,10 @@ public class MainActivity extends AppCompatActivity {
         // (Re-)Compute the ideal size of the camera-preview display (the area that the
         // camera-preview frames get rendered onto, potentially with scaling and rotation)
         // based on the size of the SurfaceView that contains the display.
+
+        // Tính kích thước lý tưởng của màn hình xem trước máy ảnh (khu vực mà
+        // khung xem trước máy ảnh được hiển thị trên đó, có khả năng chia tỷ lệ và xoay)
+        // dựa trên kích thước của SurfaceView chứa màn hình.
         Size viewSize = computeViewSize(width, height);
         Size displaySize = cameraHelper.computeDisplaySizeFromViewSize(viewSize);
         boolean isCameraRotated = cameraHelper.isCameraRotated();
@@ -166,6 +176,10 @@ public class MainActivity extends AppCompatActivity {
         // Connect the converter to the camera-preview frames as its input (via
         // previewFrameTexture), and configure the output width and height as the computed
         // display size.
+
+        // Kết nối bộ chuyển đổi với khung xem trước máy ảnh làm đầu vào của nó (thông qua
+        // previewFrameTexture), và định cấu hình chiều rộng và chiều cao đầu ra như được tính
+        // kích thước hiển thị.
         converter.setSurfaceTextureAndAttachToGLContext(
                 previewFrameTexture,
                 isCameraRotated ? displaySize.getHeight() : displaySize.getWidth(),
